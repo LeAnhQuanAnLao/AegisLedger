@@ -1,0 +1,16 @@
+# ==============================================================================
+# AEGISLEDGER - DOCKERFILE TEST RUNNER (ISOLATED TEST ENVIRONMENT)
+# ==============================================================================
+FROM maven:3.9.9-eclipse-temurin-21-alpine AS test-runner
+
+WORKDIR /workspace
+
+# Layer 1: Cache dependencies
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# Layer 2: Copy source code
+COPY src ./src
+
+# Layer 3: Run tests in an isolated, clean sandbox
+CMD ["mvn", "test", "-B"]

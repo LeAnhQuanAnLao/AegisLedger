@@ -1,0 +1,40 @@
+services:
+  # Service 1: API Web Service
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: app_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'print(1)'"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    networks:
+      - app_network
+
+  # Service 2: Background Task Worker
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    container_name: app_worker
+    restart: unless-stopped
+    environment:
+      - APP_ENV=production
+      - LOG_LEVEL=INFO
+    depends_on:
+      api:
+        condition: service_started
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge

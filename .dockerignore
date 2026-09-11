@@ -1,0 +1,43 @@
+# ==============================================================================
+# AEGISLEDGER - DOCKER IGNORE
+# ==============================================================================
+
+# Git metadata
+.git
+.gitignore
+.gitattributes
+.github
+
+# Build output
+target/
+*.jar
+*.war
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.settings/
+.project
+.classpath
+
+# Documentation & Guidelines
+docs/
+Rule/
+README.md
+*.md
+
+# Local Environment & Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Temporary files & Logs
+*.log
+logs/
+tmp/
+temp/
+scratch/
+.DS_Store
+Thumbs.db

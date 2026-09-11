@@ -1,0 +1,25 @@
+# ==============================================================================
+# DOCKERFILE DÀNH RIÊNG CHO BACKGROUND WORKER / QUEUE CONSUMER
+# ==============================================================================
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS runner
+
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -s /bin/sh -m appuser
+
+COPY src/ ./src
+
+USER appuser
+
+# Lệnh chạy Worker xử lý background task (ví dụ Celery hoặc loop consumer)
+CMD ["python", "-c", "import time; print('Worker đang lắng nghe...'); time.sleep(3600)"]

@@ -1,0 +1,27 @@
+# ==============================================================================
+# DOCKERFILE DÀNH RIÊNG CHO HTTP API SERVICE
+# ==============================================================================
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+FROM base AS runner
+
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -s /bin/sh -m appuser
+
+COPY src/ ./src
+
+USER appuser
+
+EXPOSE 8000
+
+# Chạy API Server
+CMD ["python", "-m", "src.main"]

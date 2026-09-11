@@ -1,0 +1,70 @@
+# ==============================================================================
+# TEMPLATE DOCKERFILE ĐA TẦNG (MULTI-STAGE BUILD)
+# Tối ưu kích thước, bảo mật và cô lập môi trường test
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# TẦNG 1: BASE (Môi trường nền tảng)
+# ------------------------------------------------------------------------------
+FROM python:3.11-slim AS base
+
+ENV PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+WORKDIR /app
+
+# Cài đặt các gói hệ thống tối thiểu nếu cần
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# ------------------------------------------------------------------------------
+# TẦNG 2: DEPENDENCIES BUILDER
+# ------------------------------------------------------------------------------
+FROM base AS dependencies
+
+COPY requirements.txt .
+RUN pip install --user -r requirements.txt
+
+# ------------------------------------------------------------------------------
+# TẦNG 3: TESTER (Tự động chạy Unit Test trước khi đóng gói)
+# ------------------------------------------------------------------------------
+FROM base AS tester
+
+COPY --from=dependencies /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+COPY requirements-dev.txt .
+RUN pip install --user -r requirements-dev.txt
+
+COPY src/ ./src
+COPY tests/ ./tests
+COPY pytest.ini .
+
+# Chạy test trong quá trình build image. Nếu fail, docker build sẽ ngắt ngay!
+RUN pytest tests/unit -v
+
+# ------------------------------------------------------------------------------
+# TẦNG 4: PRODUCTION RUNNER (Chỉ chứa artifact tối thiểu, chạy non-root)
+# ------------------------------------------------------------------------------
+FROM base AS runner
+
+# Tạo non-root user vì lý do bảo mật
+RUN groupadd -g 1001 appgroup && \
+    useradd -u 1001 -g appgroup -s /bin/sh -m appuser
+
+# Copy dependencies đã build
+COPY --from=dependencies /root/.local /root/.local
+ENV PATH=/root/.local/bin:$PATH
+
+# Copy source code ứng dụng
+COPY --chown=appuser:appgroup src/ ./src
+
+USER appuser
+
+EXPOSE 8000
+
+# Lệnh khởi động (Có thể ghi đè trong docker-compose cho Worker / API)
+CMD ["python", "-m", "src.main"]

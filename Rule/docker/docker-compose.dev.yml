@@ -1,0 +1,32 @@
+services:
+  api:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    container_name: app_api_dev
+    volumes:
+      - ../src:/app/src
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=development
+      - LOG_LEVEL=DEBUG
+    networks:
+      - dev_network
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    container_name: app_worker_dev
+    volumes:
+      - ../src:/app/src
+    environment:
+      - APP_ENV=development
+      - LOG_LEVEL=DEBUG
+    networks:
+      - dev_network
+
+networks:
+  dev_network:
+    driver: bridge
