@@ -5,11 +5,8 @@ FROM maven:3.9.9-eclipse-temurin-21-alpine AS builder
 
 WORKDIR /build
 
-# Pre-cache dependencies
+# Copy project files and build runnable artifact
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
-
-# Copy source code and build runnable artifact
 COPY src ./src
 RUN mvn clean package -DskipTests -B
 

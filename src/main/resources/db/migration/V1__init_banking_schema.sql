@@ -35,6 +35,7 @@ CREATE TABLE transactions (
     failure_reason VARCHAR(255),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+    version BIGINT NOT NULL DEFAULT 0,
     CONSTRAINT fk_tx_source_account FOREIGN KEY (source_account_id) REFERENCES accounts(id),
     CONSTRAINT fk_tx_dest_account FOREIGN KEY (destination_account_id) REFERENCES accounts(id)
 );
