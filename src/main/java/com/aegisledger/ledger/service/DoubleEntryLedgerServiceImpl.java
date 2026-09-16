@@ -120,4 +120,12 @@ public class DoubleEntryLedgerServiceImpl implements DoubleEntryLedgerService {
         return ledgerRepository.findByAccountIdOrderByCreatedAtDesc(accountId, pageable)
             .map(LedgerEntryDto::fromEntity);
     }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<LedgerEntryDto> getEntriesByTransactionId(UUID transactionId) {
+        return ledgerRepository.findByTransactionId(transactionId).stream()
+            .map(LedgerEntryDto::fromEntity)
+            .toList();
+    }
 }

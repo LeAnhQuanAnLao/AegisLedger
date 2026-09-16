@@ -4,6 +4,11 @@ import {
   Transaction,
   FraudRuleTelemetry,
   SystemMetrics,
+  SavingsDto,
+  LoanDto,
+  EodReportDto,
+  SimulationProgressDto,
+  TransactionFrequencyPoint,
 } from '../types/banking';
 
 export const INITIAL_MOCK_ACCOUNTS: AccountDto[] = [
@@ -151,4 +156,104 @@ export const MOCK_SYSTEM_METRICS: SystemMetrics = {
   outboxPendingCount: 0,
   uptimeSeconds: 86400 * 3 + 4200,
   avgLatencyMs: 42.5,
+};
+
+export const INITIAL_MOCK_SAVINGS: SavingsDto[] = [
+  {
+    id: 's1111111-1111-1111-1111-111111111111',
+    accountId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+    savingsNumber: 'SAV-10008892-01',
+    principalAmount: 500000.0,
+    interestRate: 6.5,
+    termMonths: 6,
+    rolloverOption: 'PRINCIPAL_AND_INTEREST',
+    accruedInterest: 5416.67,
+    startDate: '2026-08-01',
+    maturityDate: '2027-02-01',
+    status: 'ACTIVE',
+  },
+  {
+    id: 's2222222-2222-2222-2222-222222222222',
+    accountId: 'c2eeef77-7c2b-4ed6-994b-4bb7ab160c33',
+    savingsNumber: 'SAV-20005519-01',
+    principalAmount: 100000.0,
+    interestRate: 5.8,
+    termMonths: 3,
+    rolloverOption: 'PRINCIPAL_ONLY',
+    accruedInterest: 966.67,
+    startDate: '2026-08-15',
+    maturityDate: '2026-11-15',
+    status: 'ACTIVE',
+  },
+];
+
+export const INITIAL_MOCK_LOANS: LoanDto[] = [
+  {
+    id: 'l1111111-1111-1111-1111-111111111111',
+    accountId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+    loanNumber: 'LOAN-10008892-01',
+    principalAmount: 200000.0,
+    interestRate: 8.5,
+    termMonths: 12,
+    remainingPrincipal: 150000.0,
+    status: 'ACTIVE',
+    disbursedAt: '2026-06-01T00:00:00Z',
+  },
+];
+
+export const INITIAL_MOCK_EOD_REPORTS: EodReportDto[] = [
+  {
+    id: 'eod-1',
+    reconciliationDate: '2026-09-15',
+    totalAccountsChecked: 20005,
+    totalAccountBalance: 58245000.0,
+    totalLockedBalance: 50000.0,
+    totalAvailableBalance: 58195000.0,
+    totalLedgerDebits: 14520000.0,
+    totalLedgerCredits: 14520000.0,
+    ledgerBalanced: true,
+    discrepancyCount: 0,
+    status: 'BALANCED',
+    executionDurationMs: 382,
+    createdAt: new Date(Date.now() - 3600000 * 14).toISOString(),
+  },
+  {
+    id: 'eod-2',
+    reconciliationDate: '2026-09-14',
+    totalAccountsChecked: 20005,
+    totalAccountBalance: 57980000.0,
+    totalLockedBalance: 20000.0,
+    totalAvailableBalance: 57960000.0,
+    totalLedgerDebits: 12890000.0,
+    totalLedgerCredits: 12890000.0,
+    ledgerBalanced: true,
+    discrepancyCount: 0,
+    status: 'BALANCED',
+    executionDurationMs: 345,
+    createdAt: new Date(Date.now() - 3600000 * 38).toISOString(),
+  },
+];
+
+export const MOCK_FREQUENCY_TIMELINE: TransactionFrequencyPoint[] = [
+  { timeLabel: '00:00 - 03:00', transactionCount: 142, volume: 450000, successCount: 141, failedCount: 1 },
+  { timeLabel: '03:00 - 06:00', transactionCount: 88, volume: 220000, successCount: 88, failedCount: 0 },
+  { timeLabel: '06:00 - 09:00', transactionCount: 654, volume: 2100000, successCount: 650, failedCount: 4 },
+  { timeLabel: '09:00 - 12:00', transactionCount: 1840, volume: 8900000, successCount: 1828, failedCount: 12 },
+  { timeLabel: '12:00 - 15:00', transactionCount: 1420, volume: 6400000, successCount: 1412, failedCount: 8 },
+  { timeLabel: '15:00 - 18:00', transactionCount: 2250, volume: 11500000, successCount: 2235, failedCount: 15 },
+  { timeLabel: '18:00 - 21:00', transactionCount: 1190, volume: 4800000, successCount: 1184, failedCount: 6 },
+  { timeLabel: '21:00 - 24:00', transactionCount: 480, volume: 1650000, successCount: 477, failedCount: 3 },
+];
+
+export const INITIAL_MOCK_SIMULATION_PROGRESS: SimulationProgressDto = {
+  status: 'COMPLETED',
+  currentDay: 30,
+  totalDays: 30,
+  progressPercent: 100.0,
+  totalTransactions: 3600,
+  totalLedgerEntries: 7200,
+  totalSavingsAccounts: 200,
+  totalLoansDisbursed: 100,
+  executionDurationMs: 4320,
+  message: '30-Day simulation successfully completed. Zero discrepancy verified across 20,000 users.',
 };

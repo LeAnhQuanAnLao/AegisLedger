@@ -66,6 +66,20 @@ public class Transaction extends BaseEntity {
         this.sagaStep = SagaStep.STARTED;
     }
 
+    public Transaction(UUID id, String idempotencyKey, UUID sourceAccountId, UUID destinationAccountId,
+                       BigDecimal amount, Currency currency, TransactionStatus status, SagaStep sagaStep,
+                       String failureReason) {
+        this.id = Objects.requireNonNull(id, "Transaction ID cannot be null");
+        this.idempotencyKey = Objects.requireNonNull(idempotencyKey, "Idempotency key cannot be null");
+        this.sourceAccountId = Objects.requireNonNull(sourceAccountId, "Source account ID cannot be null");
+        this.destinationAccountId = Objects.requireNonNull(destinationAccountId, "Destination account ID cannot be null");
+        this.amount = Objects.requireNonNull(amount, "Amount cannot be null");
+        this.currency = Objects.requireNonNull(currency, "Currency cannot be null");
+        this.status = status != null ? status : TransactionStatus.PENDING;
+        this.sagaStep = sagaStep != null ? sagaStep : SagaStep.STARTED;
+        this.failureReason = failureReason;
+    }
+
     public void transition(TransactionStatus newStatus, SagaStep newStep) {
         this.status = newStatus;
         this.sagaStep = newStep;

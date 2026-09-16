@@ -3,6 +3,9 @@ package com.aegisledger.payment;
 import com.aegisledger.core.domain.Currency;
 import com.aegisledger.core.domain.Money;
 import com.aegisledger.core.exception.FraudDetectedException;
+import com.aegisledger.feelimit.dto.FeeCalculationResult;
+import com.aegisledger.feelimit.service.DailyLimitService;
+import com.aegisledger.feelimit.service.FeeCalculationService;
 import com.aegisledger.fraud.domain.FraudCheckContext;
 import com.aegisledger.fraud.domain.FraudCheckResult;
 import com.aegisledger.fraud.service.FraudEvaluationService;
@@ -42,6 +45,10 @@ class SagaCoordinatorTest {
     private FraudEvaluationService fraudEvaluationService;
     @Mock
     private ExternalSwitchService externalSwitchService;
+    @Mock
+    private FeeCalculationService feeCalculationService;
+    @Mock
+    private DailyLimitService dailyLimitService;
 
     @InjectMocks
     private SagaCoordinator sagaCoordinator;
@@ -71,12 +78,16 @@ class SagaCoordinatorTest {
             request.amount(),
             request.currency()
         );
+        when(feeCalculationService.calculateFee(any(Money.class))).thenAnswer(inv -> {
+            Money amt = inv.getArgument(0);
+            return FeeCalculationResult.of(amt, Money.of(0.50, amt.getCurrency()));
+        });
         when(sagaStepManager.initiateTransaction(any(), eq(request))).thenReturn(initialTx);
         when(sagaStepManager.holdFunds(any(), eq(sourceId), any(Money.class))).thenReturn(initialTx);
     }
 
     @Test
-    @DisplayName("Should successfully execute all Saga steps to COMPLETED state")
+    @DisplayName("Should successfully execute all Saga steps to COMPLETED state and record daily limit usage")
     void testHappyPathExecution() {
         Transaction completedTx = new Transaction(
             initialTx.getId(),
@@ -91,7 +102,7 @@ class SagaCoordinatorTest {
         when(fraudEvaluationService.evaluate(any(FraudCheckContext.class))).thenReturn(FraudCheckResult.pass());
         when(externalSwitchService.dispatchTransfer(any(), eq(sourceId), eq(destId), any(Money.class)))
             .thenReturn(new SwitchResponse(true, "REF-123", null));
-        when(sagaStepManager.commitSuccess(any(), eq(sourceId), eq(destId), any(Money.class), eq("Payment for services")))
+        when(sagaStepManager.commitSuccessWithFee(any(), eq(sourceId), eq(destId), any(Money.class), any(Money.class), eq("Payment for services")))
             .thenReturn(completedTx);
 
         TransferResponse response = sagaCoordinator.executeTransfer(request);
@@ -100,10 +111,12 @@ class SagaCoordinatorTest {
         assertEquals(TransactionStatus.COMPLETED, response.status());
         assertEquals(SagaStep.COMMITTED, response.currentStep());
 
+        verify(dailyLimitService).validateLimit(eq(sourceId), any(Money.class));
         verify(sagaStepManager).holdFunds(any(), eq(sourceId), any(Money.class));
         verify(fraudEvaluationService).evaluate(any(FraudCheckContext.class));
         verify(sagaStepManager).markFraudPassed(any());
-        verify(sagaStepManager).commitSuccess(any(), eq(sourceId), eq(destId), any(Money.class), eq("Payment for services"));
+        verify(sagaStepManager).commitSuccessWithFee(any(), eq(sourceId), eq(destId), any(Money.class), any(Money.class), eq("Payment for services"));
+        verify(dailyLimitService).recordUsage(eq(sourceId), any(Money.class));
     }
 
     @Test
@@ -117,7 +130,7 @@ class SagaCoordinatorTest {
         verify(sagaStepManager).holdFunds(any(), eq(sourceId), any(Money.class));
         verify(sagaStepManager).markFraudRejected(any(), eq(sourceId), any(Money.class), contains("Velocity limit exceeded"));
         verify(externalSwitchService, never()).dispatchTransfer(any(), any(), any(), any());
-        verify(sagaStepManager, never()).commitSuccess(any(), any(), any(), any(), any());
+        verify(sagaStepManager, never()).commitSuccessWithFee(any(), any(), any(), any(), any(), any());
     }
 
     @Test
@@ -147,6 +160,6 @@ class SagaCoordinatorTest {
 
         verify(sagaStepManager).holdFunds(any(), eq(sourceId), any(Money.class));
         verify(sagaStepManager).compensate(any(), eq(sourceId), any(Money.class), contains("SWITCH_TIMEOUT"));
-        verify(sagaStepManager, never()).commitSuccess(any(), any(), any(), any(), any());
+        verify(sagaStepManager, never()).commitSuccessWithFee(any(), any(), any(), any(), any(), any());
     }
 }

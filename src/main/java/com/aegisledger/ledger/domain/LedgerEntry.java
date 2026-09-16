@@ -75,4 +75,5 @@ public class LedgerEntry {
     public BigDecimal getBalanceAfter() { return balanceAfter; }
     public String getDescription() { return description; }
     public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

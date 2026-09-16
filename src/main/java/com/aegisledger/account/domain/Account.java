@@ -65,6 +65,18 @@ public class Account extends BaseEntity {
         this.status = AccountStatus.ACTIVE;
     }
 
+    public Account(UUID id, String accountNumber, String holderName, BigDecimal balance, BigDecimal lockedBalance,
+                   BigDecimal availableBalance, Currency currency, AccountStatus status) {
+        this.id = Objects.requireNonNull(id, "Account ID cannot be null");
+        this.accountNumber = Objects.requireNonNull(accountNumber, "Account number cannot be null");
+        this.holderName = Objects.requireNonNull(holderName, "Holder name cannot be null");
+        this.currency = currency != null ? currency : Currency.USD;
+        this.balance = balance;
+        this.lockedBalance = lockedBalance;
+        this.availableBalance = availableBalance;
+        this.status = status != null ? status : AccountStatus.ACTIVE;
+    }
+
     public void assertActive() {
         if (this.status != AccountStatus.ACTIVE) {
             throw new AccountLockedException(this.id, this.status.name());
@@ -125,8 +137,11 @@ public class Account extends BaseEntity {
     public String getHolderName() { return holderName; }
     public void setHolderName(String holderName) { this.holderName = holderName; }
     public BigDecimal getBalance() { return balance; }
+    public void setBalance(BigDecimal balance) { this.balance = balance; }
     public BigDecimal getLockedBalance() { return lockedBalance; }
+    public void setLockedBalance(BigDecimal lockedBalance) { this.lockedBalance = lockedBalance; }
     public BigDecimal getAvailableBalance() { return availableBalance; }
+    public void setAvailableBalance(BigDecimal availableBalance) { this.availableBalance = availableBalance; }
     public Currency getCurrency() { return currency; }
     public void setCurrency(Currency currency) { this.currency = currency; }
     public AccountStatus getStatus() { return status; }

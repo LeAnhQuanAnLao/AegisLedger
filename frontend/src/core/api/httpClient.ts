@@ -215,6 +215,25 @@ export const paymentsApi = {
   async listTransactions(): Promise<Transaction[]> {
     return mockTransactions;
   },
+
+  async listPaged(page = 0, size = 20): Promise<ApiResponse<PageResponse<Transaction>>> {
+    if (mockMode) {
+      return {
+        success: true,
+        code: 'SUCCESS',
+        message: 'OK',
+        data: {
+          content: mockTransactions.slice(page * size, (page + 1) * size),
+          totalElements: mockTransactions.length,
+          totalPages: Math.ceil(mockTransactions.length / size) || 1,
+          number: page,
+          size,
+        },
+        timestamp: new Date().toISOString(),
+      };
+    }
+    return request<PageResponse<Transaction>>(`/api/v1/payments?page=${page}&size=${size}`);
+  },
 };
 
 export const ledgerApi = {
@@ -236,6 +255,14 @@ export const ledgerApi = {
       };
     }
     return request<PageResponse<LedgerEntryDto>>(`/api/v1/ledger/${accountId}/entries?page=${page}&size=${size}`);
+  },
+
+  async getByTransactionId(txId: string): Promise<ApiResponse<LedgerEntryDto[]>> {
+    if (mockMode) {
+      const entries = mockLedgerEntries.filter((e) => e.transactionId === txId);
+      return { success: true, code: 'SUCCESS', message: 'OK', data: entries, timestamp: new Date().toISOString() };
+    }
+    return request<LedgerEntryDto[]>(`/api/v1/ledger/transaction/${txId}`);
   },
 
   async listAllEntries(): Promise<LedgerEntryDto[]> {

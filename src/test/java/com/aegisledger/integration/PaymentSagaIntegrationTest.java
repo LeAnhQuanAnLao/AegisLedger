@@ -45,6 +45,9 @@ class PaymentSagaIntegrationTest {
     private ExternalSwitchService externalSwitchService;
 
     @Autowired
+    private com.aegisledger.feelimit.service.DailyLimitService dailyLimitService;
+
+    @Autowired
     private OutboxRepository outboxRepository;
 
     @Test
@@ -82,9 +85,9 @@ class PaymentSagaIntegrationTest {
         AccountDto senderAfter = accountService.getAccount(sender.id());
         AccountDto receiverAfter = accountService.getAccount(receiver.id());
 
-        assertEquals(new BigDecimal("700.0000"), senderAfter.balance());
+        assertEquals(new BigDecimal("699.5000"), senderAfter.balance());
         assertEquals(new BigDecimal("0.0000"), senderAfter.lockedBalance());
-        assertEquals(new BigDecimal("700.0000"), senderAfter.availableBalance());
+        assertEquals(new BigDecimal("699.5000"), senderAfter.availableBalance());
 
         assertEquals(new BigDecimal("500.0000"), receiverAfter.balance());
 
@@ -157,6 +160,8 @@ class PaymentSagaIntegrationTest {
         AccountDto receiver = accountService.createAccount(
             new CreateAccountRequest(accDstNum, "Fraud Mule", Currency.USD, new BigDecimal("0.00"))
         );
+
+        dailyLimitService.configureLimit(sender.id(), new BigDecimal("200000.0000"));
 
         String key = "SAGA-FRAUD-KEY-" + UUID.randomUUID();
         // $150,000 exceeds abnormal amount threshold ($100,000 in application.yml)

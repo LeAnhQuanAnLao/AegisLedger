@@ -2,6 +2,7 @@ package com.aegisledger.payment.service;
 
 import com.aegisledger.account.service.AccountService;
 import com.aegisledger.core.domain.Money;
+import com.aegisledger.core.domain.SystemAccounts;
 import com.aegisledger.ledger.service.DoubleEntryLedgerService;
 import com.aegisledger.outbox.service.OutboxPublisherService;
 import com.aegisledger.payment.domain.SagaStep;
@@ -102,6 +103,40 @@ public class SagaStepManager {
             description,
             true
         );
+        Transaction tx = transactionRepository.findById(txId).orElseThrow();
+        tx.transition(TransactionStatus.COMPLETED, SagaStep.COMMITTED);
+        Transaction saved = transactionRepository.save(tx);
+        outboxPublisher.publishEvent("TRANSACTION", txId.toString(), "PAYMENT_COMPLETED", saved);
+        return saved;
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public Transaction commitSuccessWithFee(
+        UUID txId,
+        UUID sourceAccountId,
+        UUID destinationAccountId,
+        Money transferAmount,
+        Money feeAmount,
+        String description
+    ) {
+        ledgerService.recordTransfer(
+            txId,
+            sourceAccountId,
+            destinationAccountId,
+            transferAmount,
+            description,
+            true
+        );
+        if (feeAmount != null && feeAmount.isPositive()) {
+            ledgerService.recordTransfer(
+                txId,
+                sourceAccountId,
+                SystemAccounts.FEE_REVENUE_ACCOUNT_ID,
+                feeAmount,
+                "Transfer fee for tx " + txId,
+                true
+            );
+        }
         Transaction tx = transactionRepository.findById(txId).orElseThrow();
         tx.transition(TransactionStatus.COMPLETED, SagaStep.COMMITTED);
         Transaction saved = transactionRepository.save(tx);

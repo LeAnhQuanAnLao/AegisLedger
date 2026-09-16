@@ -23,4 +23,6 @@ public interface DoubleEntryLedgerService {
     );
 
     Page<LedgerEntryDto> getAccountLedger(UUID accountId, Pageable pageable);
+
+    List<LedgerEntryDto> getEntriesByTransactionId(UUID transactionId);
 }

@@ -120,3 +120,98 @@ export interface SystemMetrics {
   uptimeSeconds: number;
   avgLatencyMs: number;
 }
+
+export interface DailyLimitStatusDto {
+  accountId: string;
+  date: string;
+  configuredLimit: number;
+  totalSpentToday: number;
+  remainingLimit: number;
+}
+
+export interface FeeCalculationResult {
+  transferAmount: { amount: number; currency: Currency };
+  feeAmount: { amount: number; currency: Currency };
+  totalDebitAmount: { amount: number; currency: Currency };
+}
+
+export interface SavingsDto {
+  id: string;
+  accountId: string;
+  savingsNumber: string;
+  principalAmount: number;
+  interestRate: number;
+  termMonths: number;
+  rolloverOption: 'PRINCIPAL_AND_INTEREST' | 'PRINCIPAL_ONLY' | 'NO_ROLLOVER';
+  accruedInterest: number;
+  startDate: string;
+  maturityDate: string;
+  status: 'ACTIVE' | 'MATURED' | 'CLOSED_PREMATURE';
+}
+
+export interface LoanDto {
+  id: string;
+  accountId: string;
+  loanNumber: string;
+  principalAmount: number;
+  interestRate: number;
+  termMonths: number;
+  remainingPrincipal: number;
+  status: 'DISBURSED' | 'ACTIVE' | 'PAID_OFF' | 'DEFAULTED';
+  disbursedAt: string;
+}
+
+export interface EodReportDto {
+  id: string;
+  reconciliationDate: string;
+  totalAccountsChecked: number;
+  totalAccountBalance: number;
+  totalLockedBalance: number;
+  totalAvailableBalance: number;
+  totalLedgerDebits: number;
+  totalLedgerCredits: number;
+  ledgerBalanced: boolean;
+  discrepancyCount: number;
+  status: 'BALANCED' | 'DISCREPANCY_FOUND' | 'FAILED';
+  executionDurationMs: number;
+  createdAt: string;
+}
+
+export interface SimulationProgressDto {
+  status: 'IDLE' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  currentDay: number;
+  totalDays: number;
+  progressPercent: number;
+  totalTransactions: number;
+  totalLedgerEntries: number;
+  totalSavingsAccounts: number;
+  totalLoansDisbursed: number;
+  executionDurationMs: number;
+  message: string;
+}
+
+export interface SimulationResultDto {
+  status: string;
+  userCount: number;
+  daysSimulated: number;
+  totalTransactions: number;
+  totalLedgerEntries: number;
+  totalTransferVolume: number;
+  totalFeesCollected: number;
+  totalSavingsOpened: number;
+  totalSavingsPrincipal: number;
+  totalInterestExpense: number;
+  totalLoansDisbursed: number;
+  totalLoanVolume: number;
+  totalInterestIncome: number;
+  allEodReconciled: boolean;
+  totalDurationMs: number;
+}
+
+export interface TransactionFrequencyPoint {
+  timeLabel: string;
+  transactionCount: number;
+  volume: number;
+  successCount: number;
+  failedCount: number;
+}

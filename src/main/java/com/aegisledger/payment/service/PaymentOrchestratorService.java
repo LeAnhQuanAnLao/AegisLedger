@@ -34,4 +34,8 @@ public class PaymentOrchestratorService {
     public Optional<Transaction> getByIdempotencyKey(String idempotencyKey) {
         return transactionRepository.findByIdempotencyKey(idempotencyKey);
     }
+
+    public org.springframework.data.domain.Page<Transaction> listTransactions(org.springframework.data.domain.Pageable pageable) {
+        return transactionRepository.findAll(pageable);
+    }
 }

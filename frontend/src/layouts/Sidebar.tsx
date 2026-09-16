@@ -7,9 +7,13 @@ import {
   ShieldAlert,
   Server,
   Layers,
+  BarChart3,
+  UserCheck,
 } from 'lucide-react';
 
 export type NavTab =
+  | 'admin-portal'
+  | 'user-portal'
   | 'overview'
   | 'accounts'
   | 'transfer'
@@ -28,13 +32,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onTabChange,
   isMockMode,
 }) => {
-  const navItems: { id: NavTab; label: string; icon: any }[] = [
-    { id: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { id: 'accounts', label: 'Accounts Hub', icon: CreditCard },
-    { id: 'transfer', label: 'Saga Studio', icon: Send },
-    { id: 'ledger', label: 'Double-Entry Ledger', icon: BookOpen },
-    { id: 'fraud', label: 'Fraud Detection', icon: ShieldAlert },
-    { id: 'telemetry', label: 'System Telemetry', icon: Server },
+  const navItems: { id: NavTab; label: string; icon: any; badge?: string }[] = [
+    { id: 'admin-portal', label: 'Admin & Tần Suất GD', icon: BarChart3, badge: 'ADMIN' },
+    { id: 'user-portal', label: 'Khách Hàng & Sao Kê', icon: UserCheck, badge: 'USER' },
+    { id: 'overview', label: 'Dashboard Tổng Quan', icon: LayoutDashboard },
+    { id: 'accounts', label: 'Quản Lý Tài Khoản', icon: CreditCard },
+    { id: 'transfer', label: 'Saga Payment Studio', icon: Send },
+    { id: 'ledger', label: 'Sổ Cái Kép (Ledger)', icon: BookOpen },
+    { id: 'fraud', label: 'Chống Gian Lận (Fraud)', icon: ShieldAlert },
+    { id: 'telemetry', label: 'Hạ Tầng & Telemetry', icon: Server },
   ];
 
   return (
@@ -66,14 +72,29 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 key={item.id}
                 onClick={() => onTabChange(item.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
+                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 ${
                   isActive
                     ? 'bg-indigo-600 text-white shadow-glow-indigo'
                     : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50'
                 }`}
               >
-                <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                <span>{item.label}</span>
+                <div className="flex items-center gap-3">
+                  <Icon className={`w-4 h-4 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                  <span>{item.label}</span>
+                </div>
+                {item.badge && (
+                  <span
+                    className={`text-[9px] font-mono px-1.5 py-0.5 rounded font-bold ${
+                      isActive
+                        ? 'bg-white/20 text-white'
+                        : item.badge === 'ADMIN'
+                        ? 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30'
+                        : 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    }`}
+                  >
+                    {item.badge}
+                  </span>
+                )}
               </button>
             );
           })}

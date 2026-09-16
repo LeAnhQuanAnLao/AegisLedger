@@ -382,12 +382,12 @@ class ConcurrencyRaceConditionTest {
         assertEquals(totalTransfers, successCount.get(), "All bidirectional transfers must succeed");
         assertEquals(0, failureCount.get(), "No deadlocks or exceptions allowed");
 
-        // Verify balance conservation across all pairs
+        // Verify balance conservation across all pairs (accounting for 2 transfers * 0.5000 fee per pair)
         for (int i = 0; i < pairCount; i++) {
             Account refreshedA = accountRepository.findById(aliceIds[i]).orElseThrow();
             Account refreshedB = accountRepository.findById(bobIds[i]).orElseThrow();
-            BigDecimal pairTotal = refreshedA.getBalance().add(refreshedB.getBalance());
-            assertEquals(initialPairBalance, pairTotal, "Total money in pair " + i + " must remain invariant");
+            BigDecimal pairTotalWithFees = refreshedA.getBalance().add(refreshedB.getBalance()).add(new BigDecimal("1.0000"));
+            assertEquals(initialPairBalance, pairTotalWithFees, "Total money in pair " + i + " must remain invariant");
             assertEquals(new BigDecimal("0.0000"), refreshedA.getLockedBalance());
             assertEquals(new BigDecimal("0.0000"), refreshedB.getLockedBalance());
         }

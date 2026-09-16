@@ -38,4 +38,12 @@ public class LedgerController {
         );
         return ResponseEntity.ok(ApiResponse.ok(entries));
     }
+
+    @GetMapping("/transaction/{transactionId}")
+    public ResponseEntity<ApiResponse<java.util.List<LedgerEntryDto>>> getTransactionEntries(
+        @PathVariable("transactionId") UUID transactionId
+    ) {
+        java.util.List<LedgerEntryDto> entries = ledgerService.getEntriesByTransactionId(transactionId);
+        return ResponseEntity.ok(ApiResponse.ok(entries));
+    }
 }

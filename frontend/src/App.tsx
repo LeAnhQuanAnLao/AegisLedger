@@ -16,6 +16,8 @@ import {
 } from './core/api/httpClient';
 import { Sidebar, NavTab } from './layouts/Sidebar';
 import { Navbar } from './layouts/Navbar';
+import { AdminPortal } from './pages/AdminPortal';
+import { UserPortal } from './pages/UserPortal';
 import { DashboardOverview } from './pages/DashboardOverview';
 import { AccountsHub } from './pages/AccountsHub';
 import { TransferStudio } from './pages/TransferStudio';
@@ -26,7 +28,7 @@ import { Modal } from './components/ui/Modal';
 import { TransferTerminal } from './modules/transfer/TransferTerminal';
 
 export function App() {
-  const [activeTab, setActiveTab] = useState<NavTab>('overview');
+  const [activeTab, setActiveTab] = useState<NavTab>('admin-portal');
   const [isMock, setIsMock] = useState(getMockMode());
   const [accounts, setAccounts] = useState<AccountDto[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -77,6 +79,8 @@ export function App() {
   };
 
   const titles: Record<NavTab, string> = {
+    'admin-portal': 'Trung Tâm Quản Trị & Tần Suất Giao Dịch',
+    'user-portal': 'Cổng Khách Hàng Cá Nhân & Sao Kê',
     overview: 'Executive Dashboard',
     accounts: 'Accounts & Treasury',
     transfer: 'Payment Saga Studio',
@@ -105,6 +109,22 @@ export function App() {
         />
 
         <main className="flex-1 overflow-y-auto p-6 space-y-6">
+          {activeTab === 'admin-portal' && (
+            <AdminPortal
+              accounts={accounts}
+              transactions={transactions}
+              ledgerEntries={ledgerEntries}
+              onRefresh={loadData}
+            />
+          )}
+
+          {activeTab === 'user-portal' && (
+            <UserPortal
+              accounts={accounts}
+              onRefresh={loadData}
+            />
+          )}
+
           {activeTab === 'overview' && (
             <DashboardOverview
               accounts={accounts}
