@@ -4,9 +4,11 @@
 Module `idempotency` bảo vệ hệ thống khỏi tình trạng gửi trùng request (Double Charge) từ client hoặc mạng retry:
 - **Làm**:
   - Đọc header HTTP `Idempotency-Key` từ mọi request thanh toán.
+  - Tính toán mã băm SHA-256 của request payload để chống giả mạo hoặc thay đổi thông tin request khi dùng lại key.
   - Lưu trạng thái thực thi vào bảng `idempotency_records`:
-    - Nếu key chưa tồn tại: Khởi tạo bản ghi với trạng thái `IN_PROGRESS` và cho phép request đi tiếp.
-    - Nếu key đang tồn tại và trạng thái là `IN_PROGRESS`: Từ chối ngay lập tức với HTTP 409 Conflict (`DUPLICATE_REQUEST`).
+    - Nếu key chưa tồn tại: Khởi tạo bản ghi với trạng thái `IN_PROGRESS` kèm `request_hash` và cho phép request đi tiếp.
+    - Nếu key đang tồn tại nhưng `request_hash` khác biệt: Từ chối với HTTP 409 Conflict (`IDEMPOTENCY_PAYLOAD_MISMATCH`).
+    - Nếu key đang tồn tại và trạng thái là `IN_PROGRESS`: Từ chối với HTTP 409 Conflict (`DUPLICATE_REQUEST`).
     - Nếu key đã `COMPLETED`: Trả về ngay lập tức kết quả đã cache mà không kích hoạt lại business logic.
 - **Không làm**:
   - Không can thiệp vào các API đọc (GET requests).
@@ -16,9 +18,13 @@ Module `idempotency` bảo vệ hệ thống khỏi tình trạng gửi trùng r
 ## 2. Public API Contract (Giao Diện Công Khai)
 
 ### IdempotencyService
-- `boolean tryAcquire(String idempotencyKey, String requestPayloadHash)`
+- `Optional<IdempotencyRecord> tryAcquire(String idempotencyKey, String requestPayloadHash)`
 - `void complete(String idempotencyKey, int statusCode, String responseBody)`
-- `Optional<IdempotencyRecordDto> getRecord(String idempotencyKey)`
+- `void fail(String idempotencyKey)`: Xóa hoặc giải phóng key khi xảy ra lỗi hệ thống để cho phép client retry.
+
+### Exceptions
+- `DuplicateRequestException`: HTTP 409 Conflict (`DUPLICATE_REQUEST`).
+- `RequestPayloadMismatchException`: HTTP 409 Conflict (`IDEMPOTENCY_PAYLOAD_MISMATCH`).
 
 ---
 

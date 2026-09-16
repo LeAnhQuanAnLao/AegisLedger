@@ -1,6 +1,7 @@
 package com.aegisledger.idempotency.service;
 
 import com.aegisledger.core.exception.DuplicateRequestException;
+import com.aegisledger.core.exception.RequestPayloadMismatchException;
 import com.aegisledger.idempotency.domain.IdempotencyRecord;
 import com.aegisledger.idempotency.domain.IdempotencyStatus;
 import com.aegisledger.idempotency.repository.IdempotencyRepository;
@@ -32,6 +33,11 @@ public class IdempotencyService {
         Optional<IdempotencyRecord> existing = repository.findByIdempotencyKey(key);
         if (existing.isPresent()) {
             IdempotencyRecord record = existing.get();
+            if (requestHash != null && !requestHash.equals(record.getRequestHash())) {
+                log.warn("Payload hash mismatch for idempotency key {}: existing={}, incoming={}",
+                    key, record.getRequestHash(), requestHash);
+                throw new RequestPayloadMismatchException(key);
+            }
             if (record.getStatus() == IdempotencyStatus.IN_PROGRESS) {
                 log.warn("Concurrent duplicate request for key {}", key);
                 throw new DuplicateRequestException(key);
@@ -56,6 +62,14 @@ public class IdempotencyService {
             record.markCompleted(statusCode, responseBody);
             repository.save(record);
             log.debug("Marked idempotency key {} as COMPLETED", key);
+        });
+    }
+
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void fail(String key) {
+        repository.findByIdempotencyKey(key).ifPresent(record -> {
+            repository.delete(record);
+            log.debug("Released idempotency key {} on failure for retry", key);
         });
     }
 }

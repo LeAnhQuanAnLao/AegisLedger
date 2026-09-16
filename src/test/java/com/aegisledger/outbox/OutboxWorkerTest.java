@@ -29,8 +29,8 @@ class OutboxWorkerTest {
     private OutboxWorker outboxWorker;
 
     @Test
-    @DisplayName("Should fetch pending outbox events and mark them PROCESSED")
-    void testProcessPendingEventsSuccess() {
+    @DisplayName("Should fetch pending outbox events using SKIP LOCKED and mark them PROCESSED")
+    void testProcessPendingEventsWithSkipLockedSuccess() {
         OutboxEvent event = new OutboxEvent(
             UUID.randomUUID(),
             "TRANSACTION",
@@ -38,13 +38,34 @@ class OutboxWorkerTest {
             "PAYMENT_COMPLETED",
             "{\"amount\":100}"
         );
-        when(outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING))
+        when(outboxRepository.findPendingEventsForProcessing(OutboxStatus.PENDING))
             .thenReturn(List.of(event));
 
         outboxWorker.processPendingEvents();
 
         assertEquals(OutboxStatus.PROCESSED, event.getStatus());
         assertNotNull(event.getProcessedAt());
+        verify(outboxRepository).save(event);
+    }
+
+    @Test
+    @DisplayName("Should fallback to standard find query when SKIP LOCKED native query throws exception")
+    void testProcessPendingEventsFallback() {
+        OutboxEvent event = new OutboxEvent(
+            UUID.randomUUID(),
+            "TRANSACTION",
+            "TX-200",
+            "PAYMENT_COMPLETED",
+            "{\"amount\":200}"
+        );
+        when(outboxRepository.findPendingEventsForProcessing(OutboxStatus.PENDING))
+            .thenThrow(new RuntimeException("Native query unsupported"));
+        when(outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING))
+            .thenReturn(List.of(event));
+
+        outboxWorker.processPendingEvents();
+
+        assertEquals(OutboxStatus.PROCESSED, event.getStatus());
         verify(outboxRepository).save(event);
     }
 }

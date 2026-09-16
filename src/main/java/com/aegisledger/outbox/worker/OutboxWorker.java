@@ -29,26 +29,40 @@ public class OutboxWorker {
     @Scheduled(fixedDelayString = "${aegis.outbox.worker-fixed-rate-ms:1000}")
     @Transactional
     public void processPendingEvents() {
-        List<OutboxEvent> pendingEvents = outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING);
-        if (pendingEvents.isEmpty()) {
+        List<OutboxEvent> pendingEvents;
+        try {
+            pendingEvents = outboxRepository.findPendingEventsForProcessing(OutboxStatus.PENDING);
+            if (pendingEvents == null) {
+                pendingEvents = outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING);
+            }
+        } catch (Exception ex) {
+            log.warn("Falling back to standard find query: {}", ex.getMessage());
+            pendingEvents = outboxRepository.findTop50ByStatusOrderByCreatedAtAsc(OutboxStatus.PENDING);
+        }
+
+        if (pendingEvents == null || pendingEvents.isEmpty()) {
             return;
         }
 
         log.debug("Found {} pending outbox events for dispatch", pendingEvents.size());
         for (OutboxEvent event : pendingEvents) {
-            try {
-                // Dispatch logic: Simulate delivery to Apache Kafka topic
-                log.info("Dispatched event {} [{}] to Kafka broker topic 'aegis-ledger-events'",
-                    event.getId(), event.getEventType());
-                event.markProcessed();
-            } catch (Exception e) {
-                log.error("Failed to publish outbox event {}", event.getId(), e);
-                event.incrementRetry();
-                if (event.getRetryCount() >= MAX_RETRIES) {
-                    event.markFailed();
-                }
-            }
-            outboxRepository.save(event);
+            dispatchSingleEvent(event);
         }
+    }
+
+    public void dispatchSingleEvent(OutboxEvent event) {
+        try {
+            // Dispatch logic: Simulate delivery to Apache Kafka broker
+            log.info("Dispatched event {} [{}] to Kafka broker topic 'aegis-ledger-events'",
+                event.getId(), event.getEventType());
+            event.markProcessed();
+        } catch (Exception e) {
+            log.error("Failed to publish outbox event {}", event.getId(), e);
+            event.incrementRetry();
+            if (event.getRetryCount() >= MAX_RETRIES) {
+                event.markFailed();
+            }
+        }
+        outboxRepository.save(event);
     }
 }

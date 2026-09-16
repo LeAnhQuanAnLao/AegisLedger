@@ -70,4 +70,27 @@ class IdempotencyServiceTest {
         assertEquals(IdempotencyStatus.COMPLETED, result.get().getStatus());
         assertEquals("{\"success\":true}", result.get().getResponseBody());
     }
+
+    @Test
+    @DisplayName("Should throw RequestPayloadMismatchException when key exists but payload hash is different")
+    void testAcquireDifferentPayloadThrowsException() {
+        IdempotencyRecord existingRecord = new IdempotencyRecord(UUID.randomUUID(), key, "HASH-ORIGINAL");
+        when(repository.findByIdempotencyKey(key)).thenReturn(Optional.of(existingRecord));
+
+        assertThrows(
+            com.aegisledger.core.exception.RequestPayloadMismatchException.class,
+            () -> service.tryAcquire(key, "HASH-TAMPERED")
+        );
+    }
+
+    @Test
+    @DisplayName("Should delete in-progress idempotency key when fail() is invoked")
+    void testFailReleasesKey() {
+        IdempotencyRecord existingRecord = new IdempotencyRecord(UUID.randomUUID(), key, "HASH-1");
+        when(repository.findByIdempotencyKey(key)).thenReturn(Optional.of(existingRecord));
+
+        service.fail(key);
+
+        verify(repository).delete(existingRecord);
+    }
 }

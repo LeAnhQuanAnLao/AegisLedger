@@ -12,6 +12,7 @@ Module `fraud` đánh giá rủi ro gian lận giao dịch theo thời gian th�
     - `PASSED` (Score < 50): Giao dịch an toàn.
     - `SUSPICIOUS` (50 <= Score < 80): Giao dịch đáng ngờ, yêu cầu ghi nhận cảnh báo.
     - `REJECTED` (Score >= 80): Chặn đứng giao dịch ngay lập tức.
+  - Tự động thu hồi bộ nhớ (Memory Eviction & TTL): Xóa bỏ hoàn toàn các account không còn giao dịch trong sliding window ra khỏi cấu trúc in-memory, ngăn chặn triệt để rò rỉ bộ nhớ (Memory Leak).
 - **Không làm**:
   - Không trực tiếp trừ tiền hay sửa đổi tài khoản người dùng.
 

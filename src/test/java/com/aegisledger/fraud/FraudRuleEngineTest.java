@@ -6,6 +6,7 @@ import com.aegisledger.fraud.domain.FraudCheckContext;
 import com.aegisledger.fraud.domain.FraudCheckResult;
 import com.aegisledger.fraud.domain.FraudStatus;
 import com.aegisledger.fraud.engine.AbnormalAmountRule;
+import com.aegisledger.fraud.engine.FraudRule;
 import com.aegisledger.fraud.engine.HighRiskHoursRule;
 import com.aegisledger.fraud.engine.SlidingWindowCounter;
 import com.aegisledger.fraud.engine.VelocityRule;
@@ -27,9 +28,9 @@ import static org.junit.jupiter.api.Assertions.*;
 class FraudRuleEngineTest {
 
     private SlidingWindowCounter slidingWindowCounter;
-    private VelocityRule velocityRule;
-    private AbnormalAmountRule abnormalAmountRule;
-    private HighRiskHoursRule highRiskHoursRule;
+    private FraudRule velocityRule;
+    private FraudRule abnormalAmountRule;
+    private FraudRule highRiskHoursRule;
     private FraudEvaluationService fraudEvaluationService;
 
     @BeforeEach
@@ -102,5 +103,30 @@ class FraudRuleEngineTest {
 
         assertTrue(result.status() == FraudStatus.SUSPICIOUS || result.status() == FraudStatus.REJECTED);
         assertTrue(result.reasons().stream().anyMatch(r -> r.contains("VELOCITY_RULE")));
+    }
+
+    @Test
+    @DisplayName("Should successfully evict expired windows and avoid memory leak")
+    void testSlidingWindowMemoryEviction() {
+        UUID account1 = UUID.randomUUID();
+        UUID account2 = UUID.randomUUID();
+
+        Instant oldTime = Instant.parse("2026-09-11T10:00:00Z");
+        Instant recentTime = Instant.parse("2026-09-11T12:00:00Z");
+
+        // Record old transaction on account 1
+        slidingWindowCounter.recordAndCount(account1, oldTime, Duration.ofMinutes(5));
+        // Record recent transaction on account 2
+        slidingWindowCounter.recordAndCount(account2, recentTime, Duration.ofMinutes(5));
+
+        assertEquals(2, slidingWindowCounter.getTrackedAccountCount());
+
+        // Run eviction at recentTime with 5 min window
+        int evicted = slidingWindowCounter.evictExpiredWindows(recentTime, Duration.ofMinutes(5));
+
+        assertEquals(1, evicted);
+        assertEquals(1, slidingWindowCounter.getTrackedAccountCount());
+        assertEquals(0, slidingWindowCounter.countInWindow(account1, recentTime, Duration.ofMinutes(5)));
+        assertEquals(1, slidingWindowCounter.countInWindow(account2, recentTime, Duration.ofMinutes(5)));
     }
 }

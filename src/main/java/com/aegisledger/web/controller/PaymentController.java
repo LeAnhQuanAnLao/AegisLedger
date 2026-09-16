@@ -52,8 +52,10 @@ public class PaymentController {
             ? idempotencyHeader.trim()
             : request.idempotencyKey();
 
+        String payloadHash = computePayloadHash(request);
+
         // Check & acquire idempotency lock
-        Optional<IdempotencyRecord> cached = idempotencyService.tryAcquire(key, "HASH-" + key);
+        Optional<IdempotencyRecord> cached = idempotencyService.tryAcquire(key, payloadHash);
         if (cached.isPresent() && cached.get().getResponseBody() != null) {
             TransferResponse cachedResp = objectMapper.readValue(
                 cached.get().getResponseBody(), TransferResponse.class
@@ -67,8 +69,19 @@ public class PaymentController {
             idempotencyService.complete(key, 200, jsonResp);
             return ResponseEntity.ok(ApiResponse.ok(response, "Transfer completed"));
         } catch (Exception ex) {
-            idempotencyService.complete(key, 500, null);
+            idempotencyService.fail(key);
             throw ex;
+        }
+    }
+
+    private String computePayloadHash(TransferRequest request) {
+        try {
+            String payloadJson = objectMapper.writeValueAsString(request);
+            var md = java.security.MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(payloadJson.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            return java.util.HexFormat.of().formatHex(hash);
+        } catch (Exception e) {
+            return "FALLBACK-HASH-" + request.hashCode();
         }
     }
 

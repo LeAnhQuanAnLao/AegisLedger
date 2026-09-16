@@ -1,23 +1,20 @@
 package com.aegisledger.payment;
 
-import com.aegisledger.account.service.AccountService;
 import com.aegisledger.core.domain.Currency;
 import com.aegisledger.core.domain.Money;
 import com.aegisledger.core.exception.FraudDetectedException;
 import com.aegisledger.fraud.domain.FraudCheckContext;
 import com.aegisledger.fraud.domain.FraudCheckResult;
 import com.aegisledger.fraud.service.FraudEvaluationService;
-import com.aegisledger.ledger.service.DoubleEntryLedgerService;
-import com.aegisledger.outbox.service.OutboxPublisherService;
 import com.aegisledger.payment.domain.SagaStep;
 import com.aegisledger.payment.domain.Transaction;
 import com.aegisledger.payment.domain.TransactionStatus;
 import com.aegisledger.payment.dto.TransferRequest;
 import com.aegisledger.payment.dto.TransferResponse;
-import com.aegisledger.payment.repository.TransactionRepository;
 import com.aegisledger.payment.service.ExternalSwitchService;
 import com.aegisledger.payment.service.ExternalSwitchService.SwitchResponse;
 import com.aegisledger.payment.service.SagaCoordinator;
+import com.aegisledger.payment.service.SagaStepManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -40,17 +37,11 @@ import static org.mockito.Mockito.*;
 class SagaCoordinatorTest {
 
     @Mock
-    private TransactionRepository transactionRepository;
-    @Mock
-    private AccountService accountService;
+    private SagaStepManager sagaStepManager;
     @Mock
     private FraudEvaluationService fraudEvaluationService;
     @Mock
     private ExternalSwitchService externalSwitchService;
-    @Mock
-    private DoubleEntryLedgerService ledgerService;
-    @Mock
-    private OutboxPublisherService outboxPublisher;
 
     @InjectMocks
     private SagaCoordinator sagaCoordinator;
@@ -58,6 +49,7 @@ class SagaCoordinatorTest {
     private UUID sourceId;
     private UUID destId;
     private TransferRequest request;
+    private Transaction initialTx;
 
     @BeforeEach
     void setUp() {
@@ -71,15 +63,36 @@ class SagaCoordinatorTest {
             "IDEM-KEY-001",
             "Payment for services"
         );
-        when(transactionRepository.save(any(Transaction.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        initialTx = new Transaction(
+            UUID.randomUUID(),
+            request.idempotencyKey(),
+            sourceId,
+            destId,
+            request.amount(),
+            request.currency()
+        );
+        when(sagaStepManager.initiateTransaction(any(), eq(request))).thenReturn(initialTx);
+        when(sagaStepManager.holdFunds(any(), eq(sourceId), any(Money.class))).thenReturn(initialTx);
     }
 
     @Test
     @DisplayName("Should successfully execute all Saga steps to COMPLETED state")
     void testHappyPathExecution() {
+        Transaction completedTx = new Transaction(
+            initialTx.getId(),
+            request.idempotencyKey(),
+            sourceId,
+            destId,
+            request.amount(),
+            request.currency()
+        );
+        completedTx.transition(TransactionStatus.COMPLETED, SagaStep.COMMITTED);
+
         when(fraudEvaluationService.evaluate(any(FraudCheckContext.class))).thenReturn(FraudCheckResult.pass());
         when(externalSwitchService.dispatchTransfer(any(), eq(sourceId), eq(destId), any(Money.class)))
             .thenReturn(new SwitchResponse(true, "REF-123", null));
+        when(sagaStepManager.commitSuccess(any(), eq(sourceId), eq(destId), any(Money.class), eq("Payment for services")))
+            .thenReturn(completedTx);
 
         TransferResponse response = sagaCoordinator.executeTransfer(request);
 
@@ -87,44 +100,53 @@ class SagaCoordinatorTest {
         assertEquals(TransactionStatus.COMPLETED, response.status());
         assertEquals(SagaStep.COMMITTED, response.currentStep());
 
-        verify(accountService).holdFunds(eq(sourceId), any(Money.class));
+        verify(sagaStepManager).holdFunds(any(), eq(sourceId), any(Money.class));
         verify(fraudEvaluationService).evaluate(any(FraudCheckContext.class));
-        verify(ledgerService).recordTransfer(any(), eq(sourceId), eq(destId), any(Money.class), eq("Payment for services"), eq(true));
-        verify(outboxPublisher).publishEvent(eq("TRANSACTION"), any(), eq("PAYMENT_COMPLETED"), any());
+        verify(sagaStepManager).markFraudPassed(any());
+        verify(sagaStepManager).commitSuccess(any(), eq(sourceId), eq(destId), any(Money.class), eq("Payment for services"));
     }
 
     @Test
-    @DisplayName("Should abort and release held funds when fraud screening fails")
-    void testFraudRejectedThrowsException() {
+    @DisplayName("Should abort and persist FAILED transaction when fraud screening fails")
+    void testFraudRejectedThrowsExceptionAndPersistsFailed() {
         when(fraudEvaluationService.evaluate(any(FraudCheckContext.class)))
             .thenReturn(FraudCheckResult.rejected(85, List.of("Velocity limit exceeded")));
 
         assertThrows(FraudDetectedException.class, () -> sagaCoordinator.executeTransfer(request));
 
-        verify(accountService).holdFunds(eq(sourceId), any(Money.class));
-        verify(accountService).releaseHeldFunds(eq(sourceId), any(Money.class));
+        verify(sagaStepManager).holdFunds(any(), eq(sourceId), any(Money.class));
+        verify(sagaStepManager).markFraudRejected(any(), eq(sourceId), any(Money.class), contains("Velocity limit exceeded"));
         verify(externalSwitchService, never()).dispatchTransfer(any(), any(), any(), any());
-        verify(ledgerService, never()).recordTransfer(any(), any(), any(), any(), any(), anyBoolean());
+        verify(sagaStepManager, never()).commitSuccess(any(), any(), any(), any(), any());
     }
 
     @Test
     @DisplayName("Should trigger Saga Compensation when external switch fails")
     void testExternalSwitchFailureTriggersCompensation() {
+        Transaction compensatedTx = new Transaction(
+            initialTx.getId(),
+            request.idempotencyKey(),
+            sourceId,
+            destId,
+            request.amount(),
+            request.currency()
+        );
+        compensatedTx.compensate("SWITCH_TIMEOUT");
+
         when(fraudEvaluationService.evaluate(any(FraudCheckContext.class))).thenReturn(FraudCheckResult.pass());
         when(externalSwitchService.dispatchTransfer(any(), eq(sourceId), eq(destId), any(Money.class)))
             .thenReturn(new SwitchResponse(false, null, "SWITCH_TIMEOUT: Partner network unreachable"));
+        when(sagaStepManager.compensate(any(), eq(sourceId), any(Money.class), anyString()))
+            .thenReturn(compensatedTx);
 
         TransferResponse response = sagaCoordinator.executeTransfer(request);
 
         assertNotNull(response);
-        assertEquals(TransactionStatus.COMPLETED.equals(response.status()), false);
         assertEquals(TransactionStatus.COMPENSATED, response.status());
         assertEquals(SagaStep.COMPENSATED, response.currentStep());
 
-        // Verify compensation actions
-        verify(accountService).holdFunds(eq(sourceId), any(Money.class));
-        verify(accountService).releaseHeldFunds(eq(sourceId), any(Money.class));
-        verify(ledgerService, never()).recordTransfer(any(), any(), any(), any(), any(), anyBoolean());
-        verify(outboxPublisher).publishEvent(eq("TRANSACTION"), any(), eq("PAYMENT_COMPENSATED"), any());
+        verify(sagaStepManager).holdFunds(any(), eq(sourceId), any(Money.class));
+        verify(sagaStepManager).compensate(any(), eq(sourceId), any(Money.class), contains("SWITCH_TIMEOUT"));
+        verify(sagaStepManager, never()).commitSuccess(any(), any(), any(), any(), any());
     }
 }

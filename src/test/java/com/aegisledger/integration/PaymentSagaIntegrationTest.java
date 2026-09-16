@@ -143,4 +143,47 @@ class PaymentSagaIntegrationTest {
             externalSwitchService.setSimulateFailure(false);
         }
     }
+
+    @Test
+    @DisplayName("Saga Fraud Rejection: Transaction record must be persisted with FAILED status and not rolled back")
+    void testFraudRejectionPersistsFailedTransaction() {
+        // Arrange
+        String accSrcNum = "SRC-FRAUD-" + UUID.randomUUID().toString().substring(0, 8);
+        String accDstNum = "DST-FRAUD-" + UUID.randomUUID().toString().substring(0, 8);
+
+        AccountDto sender = accountService.createAccount(
+            new CreateAccountRequest(accSrcNum, "Fraud Victim", Currency.USD, new BigDecimal("200000.00"))
+        );
+        AccountDto receiver = accountService.createAccount(
+            new CreateAccountRequest(accDstNum, "Fraud Mule", Currency.USD, new BigDecimal("0.00"))
+        );
+
+        String key = "SAGA-FRAUD-KEY-" + UUID.randomUUID();
+        // $150,000 exceeds abnormal amount threshold ($100,000 in application.yml)
+        TransferRequest request = new TransferRequest(
+            sender.id(),
+            receiver.id(),
+            new BigDecimal("150000.00"),
+            Currency.USD,
+            key,
+            "Abnormal huge transfer"
+        );
+
+        // Act & Assert
+        assertThrows(com.aegisledger.core.exception.FraudDetectedException.class, () -> {
+            paymentService.transfer(request);
+        });
+
+        // Verify that Transaction was NOT rolled back and exists in database with FAILED status!
+        var txOpt = paymentService.getByIdempotencyKey(key);
+        assertTrue(txOpt.isPresent(), "Transaction record must exist in DB even when fraud rejected");
+        assertEquals(TransactionStatus.FAILED, txOpt.get().getStatus());
+        assertNotNull(txOpt.get().getFailureReason());
+
+        // Verify sender balances were fully restored
+        AccountDto senderAfter = accountService.getAccount(sender.id());
+        assertEquals(new BigDecimal("200000.0000"), senderAfter.balance());
+        assertEquals(new BigDecimal("0.0000"), senderAfter.lockedBalance());
+        assertEquals(new BigDecimal("200000.0000"), senderAfter.availableBalance());
+    }
 }

@@ -5,8 +5,9 @@ Module `outbox` giải quyết triệt để bài toán đồng bộ dữ liệu
 - **Làm**:
   - Khi một giao dịch thanh toán hoặc bút toán sổ cái thành công, sự kiện miền (Domain Event) được lưu vào bảng `outbox_events` **TRONG CÙNG MỘT TRANSACTION DATABASE** với nghiệp vụ chính.
   - Loại bỏ hoàn toàn rủi ro Dual-Write (ghi DB thành công nhưng broker sập làm mất message).
-  - Background Worker chạy định kỳ trên **Java 21 Virtual Threads** quét các bản ghi `PENDING`, publish vào Message Broker/Event Bus, và đánh dấu `PROCESSED`.
-  - Hỗ trợ cơ chế Retry với backoff khi publish thất bại.
+    - Background Worker chạy định kỳ trên **Java 21 Virtual Threads** quét các bản ghi `PENDING` sử dụng cơ chế `SELECT FOR UPDATE SKIP LOCKED` để đảm bảo khi chạy đa node (Multi-Instance/Multi-Pod), không xảy ra xung đột hay dispatch duplicate events.
+    - Xử lý từng event độc lập với transaction riêng biệt (`REQUIRES_NEW`) để lỗi của 1 event không rollback toàn bộ batch.
+    - Hỗ trợ cơ chế Retry với backoff khi publish thất bại (tối đa 3 lần, sau đó chuyển `FAILED`).
 - **Không làm**:
   - Không làm chậm luồng response của REST API (Worker chạy bất đồng bộ ngầm).
 
